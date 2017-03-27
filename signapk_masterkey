@@ -1,0 +1,75 @@
+#!/bin/bash
+
+APKFILE="./shareIO/EDGExample.apk"
+APKNAME="EDGExample"
+APKPATH="./shareIO"
+PKGNAME="fm.qingting.qtradio"
+ACTNAME="fm.qingting.qtradio.QTRadioActivity"
+
+##step0
+#todo: get the args
+while getopts ":af:n:p:" optname
+  do
+    case "$optname" in
+      "a")
+        echo "Option $optname is specified"
+        ;;
+      "f")
+        echo "Option $optname has value $OPTARG" && APKFILE="${OPTARG}" && APKNAME=${APKFILE##*/} && APKNAME=${APKNAME%.*} && APKPATH=${APKFILE%/*}
+        ;;
+      "n")
+        echo "Option $optname has value $OPTARG" && APKNAME="${OPTARG}"
+        ;;
+      "p")
+        echo "Option $optname has value $OPTARG" && APKPATH="${OPTARG}"
+        ;;
+      "?")
+        echo "Unknown option $OPTARG"
+        ;;
+      ":")
+        echo "No argument value for option $OPTARG"
+        ;;
+      *)
+      # Should not occur
+        echo "Unknown error while processing options"
+        ;;
+    esac
+  done
+
+echo "apk-name: ${APKNAME}"
+echo "apk-path: ${APKPATH}"
+
+TIMESTAMP=$(date +%y%m%d%H%M%S)
+
+echo "unzip ${APKPATH}/${APKNAME}_unsigned.apk"
+unzip ${APKPATH}/${APKNAME}_unsigned.apk -d ${APKPATH}/${APKNAME}_${TIMESTAMP} > /dev/null
+echo "unzip done"
+
+MULTIDEX=""
+
+echo "zip ${APKPATH}/${APKNAME}_${TIMESTAMP}/classes.dex"
+( cd ${APKPATH}/${APKNAME}_${TIMESTAMP}; zip classes.zip classes.dex > /dev/null )
+echo "zip done"
+
+if [ -e "${APKPATH}/${APKNAME}_${TIMESTAMP}/classes2.dex" ]; then
+  MULTIDEX="yes"
+  echo "zip ${APKPATH}/${APKNAME}_${TIMESTAMP}/classes2.dex"
+  ( cd ${APKPATH}/${APKNAME}_${TIMESTAMP}; zip classes2.zip classes2.dex > /dev/null )
+  echo "zip done"
+fi
+
+rm ${APKPATH}/${APKNAME}_signed.apk
+
+echo "AndroidMasterKeys onto ${APKPATH}/${APKNAME}_signed${MULTIDEX}.apk"
+java -jar ./othertools/TheSevenWeapons/ChangShengJian/AndroidMasterKeys.jar -a ${APKPATH}/${APKNAME}.apk -z ${APKPATH}/${APKNAME}_${TIMESTAMP}/classes.zip -o ${APKPATH}/${APKNAME}_signed${MULTIDEX}.apk > /dev/null
+echo "AndroidMasterKeys done"
+
+if [ -e "${APKPATH}/${APKNAME}_${TIMESTAMP}/classes2.dex" ]; then
+  echo "AndroidMasterKeys onto ${APKPATH}/${APKNAME}_signed.apk"
+  java -jar ./othertools/TheSevenWeapons/ChangShengJian/AndroidMasterKeys.jar -a ${APKPATH}/${APKNAME}_signed${MULTIDEX}.apk -z ${APKPATH}/${APKNAME}_${TIMESTAMP}/classes2.zip -o ${APKPATH}/${APKNAME}_signed.apk > /dev/null
+  rm ${APKPATH}/${APKNAME}_signed${MULTIDEX}.apk
+  echo "AndroidMasterKeys done"
+fi
+
+echo "rm ${APKPATH}/${APKNAME}_${TIMESTAMP}"
+rm -rf ${APKPATH}/${APKNAME}_${TIMESTAMP}

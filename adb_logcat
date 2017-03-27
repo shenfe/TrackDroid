@@ -1,0 +1,31 @@
+#!/bin/bash
+
+APKNAME="testapk"
+TIMESTAMP="20160120153800"
+
+##step0
+#todo: get the args
+while getopts "a:t:" optname
+  do
+    case "$optname" in
+      "a")
+        APKNAME="${OPTARG}"
+        ;;
+      "t")
+        TIMESTAMP="${OPTARG}"
+        ;;
+      "?")
+        #echo "Unknown option $OPTARG"
+        ;;
+      ":")
+        #echo "No argument value for option $OPTARG"
+        ;;
+      *)
+      # Should not occur
+        #echo "Unknown error while processing options"
+        ;;
+    esac
+  done
+
+adb logcat -v time -s trackdroid | grep -v -E "\.jpg|\.png"
+#adb logcat -v time -s method  > ./adboutput/logcat/${APKNAME}_${TIMESTAMP}.log

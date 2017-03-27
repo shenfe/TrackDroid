@@ -1,0 +1,18 @@
+# Get maximum X and Y coordinates:
+adb shell dumpsys window | grep mUnrestrictedScreen
+
+# Tap X,Y position
+adb shell input tap 200 200
+
+# Input text
+adb shell input text "this%sis%sa%sstring"
+
+# Input keycode
+# 82: menu, 3: home, 4: back
+adb shell input keyevent 4
+
+# Swipe X1 Y1 X2 Y2 [duration(ms)]
+adb shell input swipe 100 500 100 1450
+
+# LongPress X Y
+adb shell input swipe 100 500 100 500

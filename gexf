@@ -1,0 +1,38 @@
+#!/bin/bash
+
+APKFILE=`cat ./.target`
+echo $APKFILE
+APKNAME=""
+APKPATH=""
+
+##step0
+#todo: get the args
+while getopts "f:" optname
+  do
+    case "$optname" in
+      "f")
+        echo "Option $optname has value $OPTARG" && APKFILE="${OPTARG}" && APKNAME=${APKFILE##*/} && APKNAME=${APKNAME%.*} && APKPATH=${APKFILE%/*}
+        ;;
+      "?")
+        #echo "Unknown option $OPTARG"
+        ;;
+      ":")
+        #echo "No argument value for option $OPTARG"
+        ;;
+      *)
+      # Should not occur
+        #echo "Unknown error while processing options"
+        ;;
+    esac
+  done
+
+if [ -z "${APKNAME}" ]
+then
+  APKNAME=${APKFILE##*/} && APKNAME=${APKNAME%.*} && APKPATH=${APKFILE%/*}
+fi
+
+TIMESTAMP=$(date +%y%m%d%H%M%S)
+
+./dot2smali/tools/androguard-1.9/androgexf.py -i ${APKFILE} -o ${APKFILE}.gexf
+
+

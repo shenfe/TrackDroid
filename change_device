@@ -1,0 +1,29 @@
+#!/bin/bash
+
+DEVICE="xiaomi"
+
+##step0
+#todo: get the args
+while getopts "n:" optname
+  do
+    case "$optname" in
+      "n")
+        echo "Option $optname has value $OPTARG" && DEVICE="${OPTARG}"
+        ;;
+      "?")
+        echo "Unknown option $OPTARG"
+        ;;
+      ":")
+        echo "No argument value for option $OPTARG"
+        ;;
+      *)
+      # Should not occur
+        echo "Unknown error while processing options"
+        ;;
+    esac
+  done
+
+cp ~/.android/adb_usb.ini.${DEVICE} ~/.android/adb_usb.ini
+sudo cp /etc/udev/rules.d/51-android.rules.${DEVICE} /etc/udev/rules.d/51-android.rules
+adb kill-server
+adb start-server

@@ -1,0 +1,62 @@
+#!/bin/bash
+
+APKFILE=`cat ./.target`
+echo $APKFILE
+APKNAME=""
+APKPATH=""
+
+##step0
+#todo: get the args
+while getopts "f:n:p:" optname
+  do
+    case "$optname" in
+      "f")
+        echo "Option $optname has value $OPTARG" && APKFILE="${OPTARG}" && APKNAME=${APKFILE##*/} && APKNAME=${APKNAME%.*} && APKPATH=${APKFILE%/*} && echo ${APKFILE} >./.target
+        ;;
+      "n")
+        APKNAME="${OPTARG}"
+        ;;
+      "p")
+        APKPATH="${OPTARG}"
+        ;;
+      "?")
+        #echo "Unknown option $OPTARG"
+        ;;
+      ":")
+        #echo "No argument value for option $OPTARG"
+        ;;
+      *)
+      # Should not occur
+        #echo "Unknown error while processing options"
+        ;;
+    esac
+  done
+
+if [ -z "${APKNAME}" ]
+then
+  APKNAME=${APKFILE##*/} && APKNAME=${APKNAME%.*} && APKPATH=${APKFILE%/*}
+fi
+
+TIMESTAMP=$(date +%y%m%d%H%M%S)
+
+##step4
+#todo: run the app
+# __readINI [配置文件路径+名称] [节点名] [键值]
+function __readINI()
+{
+  INIFILE=$1; SECTION=$2; ITEM=$3
+  _readIni=`awk -F '=' '/\['$SECTION'\]/{a=1}a==1&&$1~/'$ITEM'/{print $2;exit}' $INIFILE`
+  echo ${_readIni}
+}
+
+PKGNAME=( $( __readINI ${APKPATH}/${APKNAME}.ini BASE pkgname ) )
+ACTNAME=( $( __readINI ${APKPATH}/${APKNAME}.ini BASE mainactivity ) )
+
+#( adb shell getevent -t & ./adb_logcat -a ${APKNAME} -t ${TIMESTAMP} & ./adb_capture -p ${PKGNAME} -a ${ACTNAME} -i ${APKPATH}/${APKNAME}.ini) | ./adb_pipe | python ./predict.py $PWD ${APKNAME} ${TIMESTAMP} ${PKGNAME} ${ACTNAME} ${APKPATH}
+
+rm ./presentation/data/${PKGNAME}_*.log
+
+adb shell 'echo $(date +%m%d%H%M%S)' >./presentation/data/${PKGNAME}_logcat_starttime.log & ./adb_logcat -a ${APKNAME} -t ${TIMESTAMP} >./presentation/data/${PKGNAME}_logcat.log & adb shell getevent -t >./presentation/data/${PKGNAME}_input.log & ./adb_capture -p ${PKGNAME} -a ${ACTNAME} -i ${APKPATH}/${APKNAME}.ini >./presentation/data/${PKGNAME}_capture.log
+
+
+

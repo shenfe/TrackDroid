@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gantt of Prediction Model</title>
+    <style type="text/css">
+    body {
+        padding: 0;
+        border: 0;
+        margin: 0;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    table td, table th {
+        border: 1px solid #333;
+        word-break: break-all;
+    }
+    .unhighlight {
+        background-color: #ddd;
+    }
+    .col1 {
+        width: 6%;
+    }
+    .col2 {
+        width: 35%;
+    }
+    .col3 {
+        width: 20%;
+    }
+    </style>
+    <script type="application/javascript" src="./data.js"></script>
+    <script type="application/javascript">
+
+        var Model = {
+            duration: 0,
+            xpartition: 60, // 60 parts
+            ypartition: 1 + 3,
+            sections: [0,3/60,10/60,16/60,23/60,30/60,33/60,39/60,46/60,50/60,54/60,57/60],
+            sectionlength: 1/60,
+            bars: [{id:'A',length:4},{id:'B',length:7},{id:'C',length:6},
+                {id:'D',length:2},{id:'C',length:5},{id:'D',length:7},
+                {id:'C',length:3},{id:'B',length:6},{id:'C',length:7},
+                {id:'B',length:4},{id:'A',length:4},{id:'H',length:3},
+                {id:'A',length:2}],
+            dots: [
+                {id:'x',position:[0,7/60,14/60,21/60,28/60,35/60,42/60,49/60,56/60]},
+                {id:'y',position:[10/60,39/60]},
+                {id:'z',position:[16/60,23/60]}
+            ]
+        };
+
+        var Adapter = function (ma, mo) {
+            // configure Material:
+            ma.releasetime = 2000;//2000;
+            ma.delay = {
+                activities: 0,
+                userinputs: 0,
+                logcats: 0
+            };
+            
+            // adjust userinputs' time with its delay:
+            if(ma.delay.userinputs == 0) {
+                var countHeadActivity = 1;
+                while(countHeadActivity < ma.series.activities.length) {
+                    if(ma.series.activities[countHeadActivity][1] != ma.series.activities[countHeadActivity - 1][1]) break;
+                    countHeadActivity++;
+                }
+                ma.delay.userinputs = (countHeadActivity >= ma.series.activities.length) ? ma.timeend : ((ma.series.activities[countHeadActivity][0] + ma.series.activities[countHeadActivity - 1][0]) / 2);
+            }
+            for(var i = 0, n = ma.series.userinputs.length; i < n; i++) {
+                var tmptime = ma.series.userinputs[i][0];
+                ma.series.userinputs[i][0] = (parseInt(tmptime) + ma.delay.userinputs);//.toString();
+            }
+            // adjust activities' time with its delay:
+            var numOfHead = ma.delay.activities / ((ma.timeend - ma.timestart) / ma.series.activities.length),
+                headOfActivities = ma.series.activities[0];
+            for(; numOfHead > 0; numOfHead--) {
+                ma.series.activities.unshift(headOfActivities);
+            }
+            ma.timeend = (parseInt(ma.timeend) + ma.delay.activities).toString();
+            
+
+            mo.duration = ma.timeend - ma.timestart;
+            mo.sections = [];
+            mo.bars = [];
+            mo.dots = [];
+            var timestart = parseInt(ma.timestart),
+                    timeend = parseInt(ma.timeend);
+            var totaltime = timeend - timestart;
+            mo.xpartition = ma.series.activities.length;
+            mo.sectionlength = ma.releasetime / totaltime;
+
+            var apicallset = {};
+            var apicount = 0;
+            for(var i = 0, n = ma.series.apicalls.length; i < n; i++) {
+                var tmp_apicall = ma.series.apicalls[i];
+
+                var apihash = Utils.string_hash(tmp_apicall[1]);
+                var apicalltime = (parseInt(tmp_apicall[0]) - timestart) / totaltime;
+                if(apicallset.hasOwnProperty(apihash)) {
+                    apicallset[apihash]['position'].push(apicalltime);
+                } else {
+                    apicallset[apihash] = {
+                        id: tmp_apicall[1],
+                        position: [apicalltime]
+                    };
+                    apicount++;
+                }
+            }
+            mo.ypartition = 1 + apicount;
+            for(var item in apicallset) {
+                if(!apicallset.hasOwnProperty(item)) continue;
+                mo.dots.push(apicallset[item]);
+            }
+
+            var lastActivity = [0, ''];
+            var lastActTime = 0;
+            for(var i = 0, n = ma.series.activities.length; i < n; i++) {
+                var tmp_activity = ma.series.activities[i];
+                if(tmp_activity[1] == lastActivity[1]) {
+                    //curActCount++;
+                    continue;
+                }
+                if(i > 0) {
+                    mo.bars.push({
+                        id: lastActivity[1],
+                        length: ((tmp_activity[0] *2) / 2 - lastActTime) / ((ma.timeend - ma.timestart) / ma.series.activities.length)
+                    });
+                }
+                lastActTime = (tmp_activity[0] *2) / 2;
+                lastActivity = tmp_activity;
+            }
+            if(lastActivity[1] != '') {
+                mo.bars.push({
+                    id: lastActivity[1],
+                    length: (ma.timeend - lastActTime) / ((ma.timeend - ma.timestart) / ma.series.activities.length)
+                });
+            }
+
+            ma.series.effectiveUiEvents = [];
+            var alluievents = ma.series.uievents,
+                alluserinputs = ma.series.userinputs;
+            for(var i = 0, n = alluserinputs.length; i < n; i++) {
+                var curinputtime = parseInt(alluserinputs[i][0]);
+                for(var j = 0, m = alluievents.length; j < m; j++) {
+                    var cureventtime = parseInt(alluievents[j][0]);
+                    if(cureventtime < curinputtime) continue;
+                    if(cureventtime > curinputtime + ma.releasetime) break;
+                    mo.sections.push((curinputtime - timestart) / totaltime);
+                    ma.series.effectiveUiEvents.push(curinputtime);
+                    break;
+                }
+            }
+
+            for(var i = 0, n = ma.series.apicalls.length; i < n; i++) {
+                var tmp_apicall = ma.series.apicalls[i];
+
+                addApiCallRecord(tmp_apicall[0], tmp_apicall[1], tmp_apicall.slice(2).join(', '))
+            }
+        };
+
+        var Render =  function () {
+            var minCvsHeight = (Model.dots.length + 2) * 15;
+            if(Properties.realheight - Properties.marginbottom - Properties.margintop < minCvsHeight) Properties.realheight = minCvsHeight + Properties.marginbottom + Properties.margintop;
+            Properties.width = Properties.realwidth - Properties.marginleft - Properties.marginright;
+            Properties.height = Properties.realheight - Properties.marginbottom - Properties.margintop;
+
+            var cvs = document.getElementById("mainCanvas");
+            cvs.width = Properties.realwidth;
+            cvs.height = Properties.realheight;
+            var ctx = cvs.getContext("2d");
+
+            var org = {x: Properties.marginleft, y: Properties.realheight - Properties.marginbottom};
+
+            // sections
+
+            for(var i = 0, n = Model.sections.length; i < n; i++) {
+                ctx.fillStyle = Properties.section.color;
+                ctx.fillRect(org.x + Properties.width * Model.sections[i], org.y - Properties.height,
+                        Properties.width * Model.sectionlength, Properties.height);
+
+                ctx.beginPath();
+                ctx.lineWidth = Properties.section.stroke_border;
+                ctx.strokeStyle = Properties.section.color_border;
+                ctx.moveTo(org.x + Properties.width * Model.sections[i], org.y);
+                ctx.lineTo(org.x + Properties.width * Model.sections[i], org.y - Properties.height);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.lineWidth = Properties.section.stroke_border;
+                ctx.strokeStyle = Properties.section.color_border;
+                ctx.moveTo(org.x + Properties.width * (Model.sections[i] + Model.sectionlength), org.y);
+                ctx.lineTo(org.x + Properties.width * (Model.sections[i] + Model.sectionlength), org.y - Properties.height);
+                ctx.stroke();
+            }
+
+            // bars
+
+            var barheight = Properties.height / Model.ypartition;
+            var curleftstart = org.x;
+            var xpartlength = Properties.width / Model.xpartition;
+            var ypartlength = Properties.height / Model.ypartition;
+            ctx.font = "10px Arial";
+            for(var i = 0, n = Model.bars.length; i < n; i++) {
+                ctx.fillStyle = Utils.string_color(Model.bars[i]['id']);
+                //console.log(Model.bars[i].id);
+                //console.log(Model.bars[i].length);
+                //console.log(ctx.fillStyle);
+                ctx.fillRect(curleftstart, org.y - ypartlength,
+                        Model.bars[i].length * xpartlength, ypartlength);
+
+                ctx.fillStyle = Properties.xline.label.color;
+
+                if(Properties.xline.ifdrawlabel) {
+                    ctx.textAlign = "end";
+                    ctx.textBaseline = "top";
+                    ctx.setTransform(1, Properties.bar.skew, 0, 1, curleftstart + (Model.bars[i].length * xpartlength) - 10, org.y);
+                    ctx.fillText(Model.bars[i]['id'], 0, 0);
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                }
+
+                curleftstart += Model.bars[i]['length'] * xpartlength;
+            }
+            ctx.beginPath();
+            ctx.lineWidth = Properties.yline.width;
+            ctx.strokeStyle = Properties.yline.color;
+            ctx.moveTo(org.x, org.y - ypartlength / 2);
+            ctx.lineTo(org.x - Properties.yline.markwidth, org.y - ypartlength / 2);
+            ctx.stroke();
+            ctx.font = "15px Arial";
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = Properties.xline.label.color;
+            ctx.fillText("Activities", org.x - Properties.yline.label.marginright, org.y - ypartlength / 2);
+
+            // dots
+
+            for(var i = 0, n = Model.dots.length; i < n; i++) {
+                ctx.beginPath();
+                ctx.lineWidth = Properties.yline.width;
+                ctx.strokeStyle = Properties.yline.color;
+                ctx.moveTo(org.x, org.y - ypartlength * ( i + 1.5));
+                ctx.lineTo(org.x - Properties.yline.markwidth, org.y - ypartlength * (i + 1.5));
+                ctx.stroke();
+                ctx.lineWidth = 0.35;
+                ctx.strokeStyle = '#ccc';
+                ctx.moveTo(org.x, org.y - ypartlength * ( i + 1.5));
+                ctx.lineTo(org.x + Properties.width, org.y - ypartlength * (i + 1.5));
+                ctx.stroke();
+                ctx.lineWidth = Properties.yline.width;
+                ctx.strokeStyle = Properties.yline.color;
+
+                ctx.font = "12px Arial";
+                ctx.textAlign = "right";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = Properties.xline.label.color;
+                ctx.fillText(Model.dots[i]['id'].split('(')[0], org.x - Properties.yline.label.marginright, org.y - ypartlength * (i + 1.5));
+
+                var positions = Model.dots[i]['position'];
+                var curcolor = Utils.string_color(Model.dots[i]['id']);
+                for(var j = 0, m = positions.length; j < m; j++) {
+                    ctx.beginPath();
+                    //ctx.strokeStyle = curcolor;
+                    ctx.fillStyle = curcolor;
+                    ctx.moveTo(org.x + Properties.width * positions[j], org.y - ypartlength * (i + 1.5) - Properties.dot.r);
+                    ctx.lineTo(org.x + Properties.width * positions[j], org.y - ypartlength * (i + 1.5) + Properties.dot.r);
+                    ctx.lineTo(org.x + Properties.width * positions[j] + 2 * Properties.dot.r, org.y - ypartlength * (i + 1.5));
+                    //ctx.arc(org.x + Properties.width * positions[j], org.y - ypartlength * (i + 1.5), Properties.dot.r, 0, 2*Math.PI);
+                    ctx.stroke();
+                    ctx.fill();
+                }
+            }
+
+            // 坐标轴
+
+            ctx.beginPath();
+            ctx.lineWidth = Properties.xline.width;
+            ctx.strokeStyle = Properties.xline.color;
+            ctx.moveTo(org.x, org.y);
+            ctx.lineTo(org.x + Properties.width, org.y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.lineWidth = Properties.yline.width;
+            ctx.strokeStyle = Properties.yline.color;
+            ctx.moveTo(org.x, org.y);
+            ctx.lineTo(org.x, org.y - Properties.height);
+            ctx.stroke();
+
+            // 时间刻度
+
+            for(var i = 0; i <= Model.xpartition; i++) {
+                ctx.beginPath();
+                ctx.lineWidth = Properties.xline.width;
+                ctx.strokeStyle = Properties.xline.color;
+                ctx.moveTo(org.x + i * xpartlength, org.y);
+                ctx.lineTo(org.x + i * xpartlength, org.y - Properties.xline.markheight);
+                ctx.stroke();
+
+                if(i % Properties.xline.release == 0) {
+                    ctx.font = "10px Arial";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "hanging";
+                    ctx.fillStyle = Properties.xline.label.valuecolor;
+                    var ival = i * (Model.duration / Model.xpartition);
+                    ctx.fillText((Math.round(ival) / 1000).toString(), org.x + i * xpartlength, org.y + Properties.xline.label.margintop);
+                }
+            }
+
+            var tableContainer = document.getElementById('tableContainer');
+            var remainHeight = document.documentElement.clientHeight - document.getElementById('canvasContainer').offsetHeight;
+            if(remainHeight > 0) tableContainer.style.maxHeight = remainHeight.toString() + 'px';
+        };
+
+        window.onresize = function () { location.reload(); };
+
+        var Properties = {
+            realwidth: 1200,
+            realheight: 100,
+            marginleft: 420,
+            marginright: 20,
+            margintop: 20,
+            marginbottom: 80,
+            width: 800,
+            height: 600,
+            xline: {
+                width: 1,
+                color: 'black',
+                markheight: 4,
+                label: {
+                    margintop: 2,
+                    color: 'black',
+                    valuecolor: 'red'
+                },
+                release:10,
+                ifdrawlabel: true
+            },
+            yline: {
+                width: 1,
+                color: 'black',
+                markwidth: 4,
+                label: {
+                    marginright: 8,
+                    color: 'black'
+                }
+            },
+            section: {
+                color_border: '#ccc',
+                stroke_border: 1,
+                color: '#eeeeee'
+            },
+            bar: {
+                skew: -0.25
+            },
+            dot: {
+                r: 3,
+                stroke: 0
+            }
+        };
+
+        var Utils = {
+            string_hash: function (str) {
+                var hash = 0, i, chr, len;
+                if (str.length == 0) return hash;
+                for (i = 0, len = str.length; i < len; i++) {
+                    chr = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + chr;
+                    hash |= 0; // Convert to 32bit integer
+                }
+                return Math.abs(hash);
+            },
+            string_color: function (str) {
+                var h = this.string_hash(str);
+                /*
+                 h %= (256*256*256);
+                 var h0 = h % 256;
+                 var h1 = (h / 256) % 256;
+                 var h2 = h / (256 * 256);
+                 h = h1 * 256 + ((h0 * 97) % 256);
+                 */
+                h = (h * 127*127*127) % (256*256*256);
+                var s = h.toString(16);
+                while(s.length < 6) {
+                    s = '0' + s;
+                }
+                return '#' + s;
+            }
+        };
+
+
+        window.onload = function () {
+            Adapter(material, Model);
+            Render();
+        };
+
+        function addApiCallRecord (time, name, paras) {
+            var className = name.split('->')[0],
+                methodName = name.split('->')[1];
+            var table = document.getElementById('apiCallTable');
+            var tr = document.createElement('tr');
+            var ifBeyondUiEvents = true;
+            for(var i = 0, n = material.series.effectiveUiEvents.length; i < n; i++) {
+                var curinputtime = material.series.effectiveUiEvents[i];
+                if(curinputtime > time) break;
+                if(curinputtime + material.releasetime >= time) {
+                    ifBeyondUiEvents = false;
+                    break;
+                }
+                ifBeyondUiEvents = true;
+            }
+            var trData = [time, className, methodName, (paras ? paras : '')];
+            for (var i in trData) {
+                var td = document.createElement('td');
+                td.innerText = trData[i];
+                if(i == 0) {
+                    td.style.backgroundColor = Utils.string_color(name);
+                } else if(i < 3) {
+                    if(!ifBeyondUiEvents) td.className = 'unhighlight';
+                }
+                tr.appendChild(td);
+            }
+            table.appendChild(tr);
+        }
+    </script>
+</head>
+<body>
+<div id="canvasContainer" style="text-align: center; margin: auto; overflow: auto;">
+    <canvas id="mainCanvas"></canvas>
+</div>
+<div id="tableContainer" style="width:100%;max-height:1000px;overflow:auto;margin:auto;">
+    <table id="apiCallTable">
+        <tr>
+            <th class="col1">time</th>
+            <th class="col2">class</th>
+            <th class="col3">api</th>
+            <th class="col4">paras</th>
+        </tr>
+    </table>
+</div>
+</body>
+</html>

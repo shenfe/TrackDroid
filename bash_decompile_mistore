@@ -1,0 +1,10 @@
+#!/bin/bash
+
+rm /home/santoku/Workspace/Proj201404/dot2smali/input/smali/googleplay_* -rf
+
+for i in {1..100}
+do
+  ./instrument -c -f ./appsets/MiAppStore/mistore_${i}.apk
+done
+
+java -jar ./log2db/pkgstatistics_1.4.jar /home/santoku/Workspace/Proj201404/dot2smali/input/smali 3 5 mistore >pkgstatistics_mistore.txt

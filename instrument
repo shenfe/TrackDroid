@@ -1,0 +1,119 @@
+#!/bin/bash
+
+##ensure: dir "dot2smali", dir "shareIO"...
+
+APKFILE="./shareIO/EDGExample.apk"
+APKNAME="EDGExample"
+APKPATH="./shareIO"
+DOT2SMALIVER="3.1"
+TARGETPKG="com"
+DECOMPL=""
+INSTRM=""
+NONDOTMODE="yes"
+
+##step0
+#todo: get the .apk file location
+while getopts ":cnf:p:v:" optname
+  do
+    case "$optname" in
+      "c")
+        echo "Option $optname is specified, so only need to decompile with Apktool." && DECOMPL="only"
+        ;;
+      "n")
+        echo "Option $optname is specified, so no need to instrument." && INSTRM="noneed"
+        ;;
+      "f")
+        echo "Option $optname has value $OPTARG" && APKFILE="${OPTARG}"
+        ;;
+      "p")
+        echo "Option $optname has value $OPTARG" && TARGETPKG="${OPTARG}"
+        ;;
+      "v")
+        echo "Option $optname has value $OPTARG" && DOT2SMALIVER="${OPTARG}"
+        ;;
+      "?")
+        echo "Unknown option $OPTARG"
+        ;;
+      ":")
+        echo "No argument value for option $OPTARG"
+        ;;
+      *)
+      # Should not occur
+        echo "Unknown error while processing options"
+        ;;
+    esac
+  done
+
+echo "apk-file: ${APKFILE}"
+
+echo ${APKFILE} >./.target
+
+APKNAME=${APKFILE##*/}
+APKNAME=${APKNAME%.*}
+APKPATH=${APKFILE%/*}
+
+echo "apk-name: ${APKNAME}"
+echo "apk-path: ${APKPATH}"
+
+
+##step1
+#todo: generate .dot folder, debag .apk file
+#tool: androdd.py, apktool
+rm ${APKPATH}/${APKNAME}.json
+
+if [ -z "${DECOMPL}" ]
+then
+  if [ ! -d "./dot2smali/input/dot/${APKNAME}" ]; then
+    rm -rf ./dot2smali/input/dot/${APKNAME}
+    if [ -z "${NONDOTMODE}" ]; then
+      mkdir ./dot2smali/input/dot/${APKNAME}
+      echo "generating dots"
+      python ./dot2smali/tools/androguard-1.9/androdd.py -i ${APKFILE} -o ./dot2smali/input/dot/${APKNAME} -d
+    fi
+  else
+    echo "Dir ./dot2smali/input/dot/${APKNAME} exists!"
+    if [ -n "${NONDOTMODE}" ]; then
+      rm -rf ./dot2smali/input/dot/${APKNAME}
+    fi
+  fi
+fi
+
+if [ ! -d "./dot2smali/input/smali/${APKNAME}" ]
+then
+  rm -rf ./dot2smali/input/smali/${APKNAME}
+  echo "apktool path: ${APKTOOLPATH}"
+  if [ -z "${APKTOOLPATH}" ]
+  then
+    echo "using new apktool"
+    apktool d ${APKFILE} -o ./dot2smali/input/smali/${APKNAME}
+  else
+    echo "using old apktool"
+    ${APKTOOLPATH}apktool d -f ${APKFILE} ./dot2smali/input/smali/${APKNAME}
+  fi
+else
+  echo "Dir ./dot2smali/input/smali/${APKNAME} exists!"
+fi
+
+if [ -z "${DECOMPL}" ]
+then
+  if [ -z "${INSTRM}" ]
+  then
+    #todo: let usr select the target package path
+    tree ./dot2smali/input/smali/${APKNAME}/smali -d
+    echo -e "select the package path (format as 'com/example'): "
+    read TARGETPKG
+    
+    ##step2
+    #todo: modify .smali files with new .dot files
+    #tool: dot2smali
+    echo -e "Instrumentation starts."
+    cd dot2smali
+    java -jar dot2smali_${DOT2SMALIVER}.jar ${APKNAME} ${APKPATH} ${TARGETPKG}
+    cd ..
+  fi
+  
+  ##step3
+  #todo: new apk srcFolder -> unsigned apk -> signed apk -> install
+  #tool: adb_run
+  ./adb_run -n ${APKNAME} -p ${APKPATH}
+fi

@@ -1,0 +1,12 @@
+onClick(Landroid/view/View;)V
+onLongClick(Landroid/view/View;)Z
+onFocusChange(Landroid/view/View;Z)V
+onKey(Landroid/view/View;ILandroid/view/KeyEvent;)Z
+onTouch(Landroid/view/View;Landroid/view/MotionEvent;)Z
+onCreateContextMenu(Landroid/view/ContextMenu;Landroid/view/View;Landroid/view/ContextMenu$ContextMenuInfo;)V
+onKeyDown(ILandroid/view/KeyEvent;)Z
+onKeyUp(ILandroid/view/KeyEvent;)Z
+onTrackballEvent(Landroid/view/MotionEvent;)Z
+onTouchEvent(Landroid/view/MotionEvent;)Z
+onCreate(Landroid/os/Bundle;)V
+onResume()V

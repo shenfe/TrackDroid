@@ -1,0 +1,99 @@
+#!/bin/bash
+
+##ensure: dir "dot2smali", dir "shareIO"...
+
+APKFILE="./shareIO/EDGExample.apk"
+APKNAME="EDGExample"
+APKPATH="./shareIO"
+#APKTOOLPATH="./dot2smali/tools/apktool-install-linux-r05-ibot/"
+APKTOOLPATH=""
+PKGNAME="fm.qingting.qtradio"
+ACTNAME="fm.qingting.qtradio.QTRadioActivity"
+DEBUG=""
+USEMASTERKEY="yes"
+
+##step0
+#todo: get the args
+while getopts ":df:n:p:t:" optname
+  do
+    case "$optname" in
+      "d")
+        echo "Option $optname is specified" && DEBUG="_debug"
+        ;;
+      "f")
+        echo "Option $optname has value $OPTARG" && APKFILE="${OPTARG}" && APKNAME=${APKFILE##*/} && APKNAME=${APKNAME%.*} && APKPATH=${APKFILE%/*} && echo ${APKFILE} >./.target
+        ;;
+      "n")
+        echo "Option $optname has value $OPTARG" && APKNAME="${OPTARG}"
+        ;;
+      "p")
+        echo "Option $optname has value $OPTARG" && APKPATH="${OPTARG}"
+        ;;
+      "t")
+        echo "Option $optname has value $OPTARG" && APKTOOLPATH="${OPTARG}"
+        ;;
+      "?")
+        echo "Unknown option $OPTARG"
+        ;;
+      ":")
+        echo "No argument value for option $OPTARG"
+        ;;
+      *)
+      # Should not occur
+        echo "Unknown error while processing options"
+        ;;
+    esac
+  done
+
+echo "apk-name: ${APKNAME}"
+echo "apk-path: ${APKPATH}"
+echo "apktool: ${APKTOOLPATH}"
+
+
+##step3
+#todo: new apk srcFolder -> unsigned apk -> signed apk -> install
+#tool: apktool, signapk.jar, adb
+if [ -z "${APKTOOLPATH}" ]
+then
+  apktool b ./dot2smali/output/smali/${APKNAME} -o ${APKPATH}/${APKNAME}_unsigned.apk
+else
+  ${APKTOOLPATH}apktool b ./dot2smali/output/smali/${APKNAME}  ${APKPATH}/${APKNAME}_unsigned.apk
+fi
+
+if [ -z "${USEMASTERKEY}" ]
+then
+  java -jar ./dot2smali/tools/apktool-install-linux-r05-ibot/signapk.jar  ./dot2smali/tools/apktool-install-linux-r05-ibot/platform.x509.pem ./dot2smali/tools/apktool-install-linux-r05-ibot/platform.pk8  ${APKPATH}/${APKNAME}_unsigned.apk ${APKPATH}/${APKNAME}_signed.apk
+else
+  ./signapk_masterkey -f ${APKPATH}/${APKNAME}.apk
+fi
+
+TIMESTAMP=$(date +%y%m%d%H%M%S)
+LOGFILE="${APKNAME}_${TIMESTAMP}"
+
+##step4
+#todo: run the app
+# __readINI [配置文件路径+名称] [节点名] [键值]
+function __readINI()
+{
+  INIFILE=$1; SECTION=$2; ITEM=$3
+  _readIni=`awk -F '=' '/\['$SECTION'\]/{a=1}a==1&&$1~/'$ITEM'/{print $2;exit}' $INIFILE`
+  echo ${_readIni}
+}
+
+PKGNAME=( $( __readINI ${APKPATH}/${APKNAME}.ini BASE pkgname ) )
+ACTNAME=( $( __readINI ${APKPATH}/${APKNAME}.ini BASE mainactivity ) )
+
+adb uninstall ${PKGNAME}
+adb install ${APKPATH}/${APKNAME}_signed.apk
+
+adb logcat -c
+
+echo -e "Launch app."
+adb shell am start -n ${PKGNAME}/${ACTNAME}
+
+echo -e "Redirect logcat."
+echo -e "Capture the device & app state."
+./adb_monitor${DEBUG} -n ${APKNAME} -p ${APKPATH}
+#( adb shell getevent -t & ./adb_logcat -a ${APKNAME} -t ${TIMESTAMP} & ./adb_capture -p ${PKGNAME} -a ${ACTNAME} -i ${APKPATH}/${APKNAME}.ini) | ./adb_pipe | python ./predict.py $PWD ${APKNAME} ${TIMESTAMP} ${PKGNAME} ${ACTNAME} ${APKPATH}
+#python ./predict.py $PWD ${APKNAME} ${TIMESTAMP} ${PKGNAME} ${ACTNAME} ${APKPATH}
+#(./adb_capture & adb logcat -v time -s method) | ./adb_pipe

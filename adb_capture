@@ -1,0 +1,59 @@
+#!/bin/bash
+
+PKGNAME="fm.qingting.qtradio"
+ACTNAME="fm.qingting.qtradio.QTRadioActivity"
+PKGINIFILE="./shareIO/qingting.fm_5.0.1.ini"
+
+##step0
+#todo: get the args
+while getopts ":tp:a:i:" optname
+  do
+    case "$optname" in
+      "t")
+        #echo "Option $optname is specified"
+        ;;
+      "p")
+        PKGNAME="${OPTARG}"
+        ;;
+      "a")
+        ACTNAME="${OPTARG}"
+        ;;
+      "i")
+        PKGINIFILE="${OPTARG}"
+        ;;
+      "?")
+        #echo "Unknown option $OPTARG"
+        ;;
+      ":")
+        #echo "No argument value for option $OPTARG"
+        ;;
+      *)
+      # Should not occur
+        #echo "Unknown error while processing options"
+        ;;
+    esac
+  done
+
+# __readINI [配置文件路径+名称] [节点名] [键值]
+function __readINI()
+{
+  INIFILE=$1; SECTION=$2; ITEM=$3
+  _readIni=`awk -F '=' '/\['$SECTION'\]/{a=1}a==1&&$1~/'$ITEM'/{print $2;exit}' $INIFILE`
+  echo ${_readIni}
+}
+
+##adb shell dumpsys activity
+##adb shell dumpsys activity activities
+#adb shell dumpsys activity | grep top-activity
+#adb shell dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp'
+##adb shell dumpsys activity ${PKGNAME}
+
+while [ 1 ]
+do
+    date +%s%N | cut -b1-13 #milliseconds
+    #adb shell dumpsys activity | grep top-activity
+    #adb shell dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp'
+    adb shell dumpsys window windows | grep -E 'mCurrentFocus'
+    sleep 1
+done
+
