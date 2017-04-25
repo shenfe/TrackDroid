@@ -2,6 +2,8 @@
 
 通过字节码分析和插桩，对 Android 应用程序进行污点追踪，解析程序行为。
 
+![Architecture Overview](https://raw.githubusercontent.com/shenfe/TrackDroid/master/screenshots/overview.png)
+
 ## instrument
 
 “一条龙”命令。
