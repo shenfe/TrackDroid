@@ -29,3 +29,6 @@
 
 查看监视结果。
 
+# License
+
+[MIT](http://opensource.org/licenses/MIT)
