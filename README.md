@@ -29,6 +29,8 @@
 
 查看监视结果。
 
+![Output Data Representation](https://raw.githubusercontent.com/shenfe/TrackDroid/master/screenshots/%E6%95%B0%E6%8D%AE%E5%8F%AF%E8%A7%86%E5%8C%96.PNG)
+
 # License
 
 [MIT](http://opensource.org/licenses/MIT)
